@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+/*
+  Semantic color tokens modeled on macOS system materials (sidebar, toolbar,
+  content) rather than a single flat gray scale, so light/dark both read as
+  native surfaces instead of an inverted palette. The code editor itself stays
+  dark in both modes (an intentional choice, same as Xcode's editor theme
+  being independent of the app's own appearance).
+*/
+:root {
+  --surface-toolbar: #ececec;
+  --surface-sidebar: #f5f5f6;
+  --surface-panel: #f7f7f8;
+  --surface-editor: #1e1e1e;
+  --surface-editor-gutter: #1e1e1e;
+
+  --border-hairline: rgba(0, 0, 0, 0.11);
+  --border-hairline-strong: rgba(0, 0, 0, 0.18);
+
+  --text-primary: #1d1d1f;
+  --text-secondary: rgba(0, 0, 0, 0.55);
+  --text-tertiary: rgba(0, 0, 0, 0.35);
+
+  --accent: #007aff;
+  --accent-tint: rgba(0, 122, 255, 0.14);
+  --accent-run: #248a3d;
+  --accent-run-hover: #1f7a35;
+  --accent-stop: #d70015;
+
+  --focus-ring: #007aff;
+
+  --font-ui:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  --font-mono:
+    ui-monospace, "SF Mono", "Cascadia Code", "Menlo", "Consolas", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface-toolbar: #292a2c;
+    --surface-sidebar: #242527;
+    --surface-panel: #1f2022;
+    --surface-editor: #1e1e1e;
+    --surface-editor-gutter: #1e1e1e;
+
+    --border-hairline: rgba(255, 255, 255, 0.1);
+    --border-hairline-strong: rgba(255, 255, 255, 0.16);
+
+    --text-primary: #f5f5f7;
+    --text-secondary: rgba(255, 255, 255, 0.55);
+    --text-tertiary: rgba(255, 255, 255, 0.35);
+
+    --accent: #0a84ff;
+    --accent-tint: rgba(10, 132, 255, 0.22);
+    --accent-run: #30d158;
+    --accent-run-hover: #28b84c;
+    --accent-stop: #ff453a;
+
+    --focus-ring: #0a84ff;
+  }
+}
+
+@theme inline {
+  --color-surface-toolbar: var(--surface-toolbar);
+  --color-surface-sidebar: var(--surface-sidebar);
+  --color-surface-panel: var(--surface-panel);
+  --color-surface-editor: var(--surface-editor);
+  --color-border-hairline: var(--border-hairline);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-accent: var(--accent);
+  --font-sans: var(--font-ui);
+  --font-mono: var(--font-mono);
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background: var(--surface-panel);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+}
+
+/* Visible keyboard focus everywhere — desktop apps rely on it, not just hover. */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+/* Thin, native-feeling scrollbars instead of the default browser chrome. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-hairline-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-hairline-strong);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
