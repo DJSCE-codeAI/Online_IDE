@@ -7,6 +7,7 @@ import Tabs, { type OpenTab } from "@/components/Tabs";
 import Editor, { type CursorPosition } from "@/components/Editor";
 import OutputPanel, { type RunResult } from "@/components/OutputPanel";
 import PreviewPanel from "@/components/PreviewPanel";
+import TerminalPanel from "@/components/TerminalPanel";
 import StatusBar from "@/components/StatusBar";
 import { findNode, type WorkspaceNode } from "@/lib/types";
 import { isRunnable } from "@/lib/languageMap";
@@ -21,7 +22,7 @@ import {
   deleteLocalEntry,
   isFileSystemAccessSupported,
   readLocalFile,
-  renameLocalFile,
+  renameLocalEntry,
   writeLocalFile,
   type LocalEntry,
 } from "@/lib/localFs";
@@ -70,9 +71,10 @@ export default function LocalFolderPage() {
 
   const [running, setRunning] = useState(false);
   const [runResult, setRunResult] = useState<RunResult | null>(null);
+  const [stdin, setStdin] = useState("");
   const [saving, setSaving] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(true);
-  const [rightPanel, setRightPanel] = useState<"console" | "preview">("console");
+  const [rightPanel, setRightPanel] = useState<"console" | "terminal" | "preview">("console");
   const [previewManifest, setPreviewManifest] = useState<Record<string, string> | null>(null);
   const [cursor, setCursor] = useState<CursorPosition | null>(null);
 
@@ -341,13 +343,10 @@ export default function LocalFolderPage() {
     async (id: string, name: string): Promise<OpResult> => {
       const entry = entriesRef.current.get(id);
       if (!entry) return { ok: false, error: "Couldn't find that item." };
-      if (entry.handle.kind === "directory") {
-        return { ok: false, error: "Renaming folders isn't supported in local mode yet — only files." };
-      }
       const node = findNode(tree, id);
       if (!node) return { ok: false, error: "Couldn't find that item." };
       try {
-        await renameLocalFile(entry.parentHandle, node.name, name);
+        await renameLocalEntry(entry.parentHandle, node.name, name, node.type);
         await refreshTree(dirHandle!);
         return { ok: true };
       } catch (e) {
@@ -405,7 +404,7 @@ export default function LocalFolderPage() {
       const res = await fetch("/api/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: file.name, content: file.content }),
+        body: JSON.stringify({ filename: file.name, content: file.content, stdin }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -573,6 +572,12 @@ export default function LocalFolderPage() {
         <div style={{ width: consoleResize.width }} className="shrink-0 flex flex-col">
           <div className="flex items-center h-8 border-b border-(--border-hairline) bg-(--surface-panel) shrink-0 text-[11px] font-semibold uppercase tracking-wide">
             <button
+              onClick={() => setRightPanel("terminal")}
+              className={`px-3 h-full ${rightPanel === "terminal" ? "text-(--text-primary) border-b-2 border-(--accent) -mb-px" : "text-(--text-tertiary)"}`}
+            >
+              Terminal
+            </button>
+            <button
               onClick={() => setRightPanel("console")}
               className={`px-3 h-full ${rightPanel === "console" ? "text-(--text-primary) border-b-2 border-(--accent) -mb-px" : "text-(--text-tertiary)"}`}
             >
@@ -589,7 +594,9 @@ export default function LocalFolderPage() {
           </div>
           <div className="flex-1 min-h-0">
             {rightPanel === "console" ? (
-              <OutputPanel running={running} result={runResult} />
+              <OutputPanel running={running} result={runResult} stdin={stdin} onStdinChange={setStdin} />
+            ) : rightPanel === "terminal" ? (
+              <TerminalPanel socketUrl={process.env.NEXT_PUBLIC_TERMINAL_WS_URL} />
             ) : (
               <PreviewPanel manifest={previewManifest} entryPath={previewEntryPath} />
             )}

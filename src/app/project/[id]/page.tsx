@@ -7,6 +7,7 @@ import Tabs, { type OpenTab } from "@/components/Tabs";
 import Editor, { type CursorPosition } from "@/components/Editor";
 import OutputPanel, { type RunResult } from "@/components/OutputPanel";
 import PreviewPanel from "@/components/PreviewPanel";
+import TerminalPanel from "@/components/TerminalPanel";
 import StatusBar from "@/components/StatusBar";
 import { findNode, type Project, type TreeNode, type WorkspaceNode } from "@/lib/types";
 import { isRunnable } from "@/lib/languageMap";
@@ -16,6 +17,7 @@ import { useToast } from "@/components/ToastProvider";
 import { useDialog } from "@/components/DialogProvider";
 import { useResizableWidth } from "@/lib/useResizableWidth";
 import { flattenTreeWithPaths, hasHtmlEntry, isPreviewableFile, pickPreviewEntry } from "@/lib/previewFiles";
+import { cacheProject, getCachedProject } from "@/lib/localDb";
 
 const AUTOSAVE_DELAY_MS = 900;
 
@@ -52,9 +54,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   const [running, setRunning] = useState(false);
   const [runResult, setRunResult] = useState<RunResult | null>(null);
+  const [stdin, setStdin] = useState("");
   const [saving, setSaving] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(true);
-  const [rightPanel, setRightPanel] = useState<"console" | "preview">("console");
+  const [rightPanel, setRightPanel] = useState<"console" | "terminal" | "preview">("console");
   const [cursor, setCursor] = useState<CursorPosition | null>(null);
 
   const sidebarResize = useResizableWidth("ide.sidebarWidth", 240, 160, 480, "right");
@@ -92,6 +95,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   const loadTree = useCallback(async () => {
     const seq = ++loadSeq.current;
+    const cached = await getCachedProject(projectId);
+    if (cached && seq === loadSeq.current) {
+      setProject(cached.project);
+      setTree(cached.tree);
+    }
     const res = await fetch(`/api/projects/${projectId}`, { cache: "no-store" });
     if (seq !== loadSeq.current) return;
     if (!res.ok) {
@@ -102,6 +110,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     if (seq !== loadSeq.current) return;
     setProject(data.project);
     setTree(data.tree);
+    await cacheProject(data.project, data.tree);
   }, [projectId]);
 
   useEffect(() => {
@@ -188,13 +197,14 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           return;
         }
         setOpenFiles((prev) => prev.map((f) => (f.id === file.id ? { ...f, dirty: false } : f)));
+        await loadTree();
       } catch {
         toast.show("Couldn't save — check your connection.", "error");
       } finally {
         setSaving(false);
       }
     },
-    [toast]
+    [toast, loadTree]
   );
 
   const saveActive = useCallback(async () => {
@@ -241,7 +251,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         body: JSON.stringify({ project_id: projectId, parent_id: parentId, name, type }),
       });
       if (!res.ok) return { ok: false, error: await parseErrorBody(res) };
-      loadTree();
+      await loadTree();
       return { ok: true };
     },
     [projectId, loadTree]
@@ -254,7 +264,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       body: JSON.stringify({ id, name }),
     });
     if (!res.ok) return { ok: false, error: await parseErrorBody(res) };
-    loadTree();
+    await loadTree();
     return { ok: true };
   }, [loadTree]);
 
@@ -265,7 +275,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       body: JSON.stringify({ id }),
     });
     if (!res.ok) return { ok: false, error: await parseErrorBody(res) };
-    loadTree();
+    await loadTree();
     return { ok: true };
   }, [loadTree]);
 
@@ -323,7 +333,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       const res = await fetch("/api/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: file.name, content: file.content }),
+        body: JSON.stringify({ filename: file.name, content: file.content, stdin }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -475,6 +485,12 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         <div style={{ width: consoleResize.width }} className="shrink-0 flex flex-col">
           <div className="flex items-center h-8 border-b border-(--border-hairline) bg-(--surface-panel) shrink-0 text-[11px] font-semibold uppercase tracking-wide">
             <button
+              onClick={() => setRightPanel("terminal")}
+              className={`px-3 h-full ${rightPanel === "terminal" ? "text-(--text-primary) border-b-2 border-(--accent) -mb-px" : "text-(--text-tertiary)"}`}
+            >
+              Terminal
+            </button>
+            <button
               onClick={() => setRightPanel("console")}
               className={`px-3 h-full ${rightPanel === "console" ? "text-(--text-primary) border-b-2 border-(--accent) -mb-px" : "text-(--text-tertiary)"}`}
             >
@@ -491,7 +507,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           </div>
           <div className="flex-1 min-h-0">
             {rightPanel === "console" ? (
-              <OutputPanel running={running} result={runResult} />
+              <OutputPanel running={running} result={runResult} stdin={stdin} onStdinChange={setStdin} />
+            ) : rightPanel === "terminal" ? (
+              <TerminalPanel socketUrl={process.env.NEXT_PUBLIC_TERMINAL_WS_URL} />
             ) : (
               <PreviewPanel manifest={previewManifest} entryPath={previewEntryPath} />
             )}

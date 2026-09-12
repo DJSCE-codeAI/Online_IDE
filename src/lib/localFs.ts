@@ -80,20 +80,38 @@ export async function deleteLocalEntry(
   await parentHandle.removeEntry(name, { recursive });
 }
 
-// The File System Access API has no rename primitive. For a file this
-// recreates it under the new name and removes the old one; folder rename
-// would need a recursive copy of every descendant and isn't supported yet.
-export async function renameLocalFile(
+export async function renameLocalEntry(
   parentHandle: FileSystemDirectoryHandle,
   oldName: string,
-  newName: string
-): Promise<FileSystemFileHandle> {
-  const oldHandle = await parentHandle.getFileHandle(oldName);
-  const content = await readLocalFile(oldHandle);
-  const newHandle = await parentHandle.getFileHandle(newName, { create: true });
-  await writeLocalFile(newHandle, content);
-  await parentHandle.removeEntry(oldName);
-  return newHandle;
+  newName: string,
+  type: "file" | "folder"
+): Promise<void> {
+  if (type === "file") {
+    const oldHandle = await parentHandle.getFileHandle(oldName);
+    const content = await readLocalFile(oldHandle);
+    const newHandle = await parentHandle.getFileHandle(newName, { create: true });
+    await writeLocalFile(newHandle, content);
+    await parentHandle.removeEntry(oldName);
+    return;
+  }
+
+  const oldHandle = await parentHandle.getDirectoryHandle(oldName);
+  const newHandle = await parentHandle.getDirectoryHandle(newName, { create: true });
+  await copyDirectory(oldHandle, newHandle);
+  await parentHandle.removeEntry(oldName, { recursive: true });
+}
+
+async function copyDirectory(source: FileSystemDirectoryHandle, target: FileSystemDirectoryHandle): Promise<void> {
+  for await (const [name, handle] of source.entries()) {
+    if (handle.kind === "file") {
+      const content = await readLocalFile(handle);
+      const copy = await target.getFileHandle(name, { create: true });
+      await writeLocalFile(copy, content);
+    } else {
+      const child = await target.getDirectoryHandle(name, { create: true });
+      await copyDirectory(handle, child);
+    }
+  }
 }
 
 export function isFileSystemAccessSupported(): boolean {

@@ -3,7 +3,7 @@ import { executeCode } from "@/lib/judge0";
 import { getLangConfig } from "@/lib/languageMap";
 
 export async function POST(req: NextRequest) {
-  const { filename, content } = await req.json();
+  const { filename, content, stdin } = await req.json();
 
   if (!filename || content === undefined) {
     return NextResponse.json({ error: "filename and content are required" }, { status: 400 });
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await executeCode(lang.judge0Id, content);
+    const result = await executeCode(lang.judge0Id, content, typeof stdin === "string" ? stdin : "");
     return NextResponse.json(result);
   } catch (err) {
     return NextResponse.json(
