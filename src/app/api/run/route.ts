@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { executeCode } from "@/lib/judge0";
+import { executeCode } from "@/lib/executor";
 import { getLangConfig } from "@/lib/languageMap";
 
 export async function POST(req: NextRequest) {
@@ -15,7 +15,22 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await executeCode(lang.judge0Id, content, typeof stdin === "string" ? stdin : "");
+    if (lang.runner === "preview") {
+      return NextResponse.json({
+        stdout: "",
+        stderr: "",
+        exitCode: 0,
+        status: "Preview available",
+        time: null,
+        memory: null,
+      });
+    }
+
+    const result = await executeCode(
+      lang.runner,
+      content,
+      typeof stdin === "string" ? stdin : ""
+    );
     return NextResponse.json(result);
   } catch (err) {
     return NextResponse.json(

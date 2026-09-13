@@ -4,24 +4,25 @@
 
 - Node.js 20 or newer and npm
 - A Supabase project for cloud projects
-- A Judge0 CE/self-hosted endpoint for Python, JavaScript, C, and C++ execution
+- Docker Desktop with Compose v2
 - Chrome or Edge for local-folder mode
 
 ## Install and start
 
 ```bash
 npm install
-copy .env.example .env.local
+copy .env.local.example .env.local
+docker compose up --build -d
 npm run dev
 ```
 
-Open `http://localhost:3000`. Use `npm run lint`, `npx tsc --noEmit`, and `npm run build` for validation and production checks.
+Open `http://localhost:3000`. Keep the executor running while using **Run**. Stop it with `docker compose down` when finished. Use `npm run lint`, `npx tsc --noEmit`, and `npm run build` for validation and production checks.
 
 ## Environment variables
 
-`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` configure the browser-safe Supabase client. `JUDGE0_BASE_URL` and `JUDGE0_API_KEY` are read only by the server route. The optional `NEXT_PUBLIC_TERMINAL_WS_URL` must point to a sandboxed WebSocket service; it must not provide direct host shell access.
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` configure the browser-safe Supabase client. The legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` name is also accepted. `EXECUTOR_URL` is the server-only URL for the local executor and defaults to `http://localhost:4000`. The optional `NEXT_PUBLIC_TERMINAL_WS_URL` must point to a sandboxed WebSocket service; it must not provide direct host shell access.
 
-Do not commit `.env.local`. The public Supabase anon key is protected by database policies, but service-role keys and Judge0 credentials must never use a `NEXT_PUBLIC_` prefix.
+Do not commit `.env.local`. The public Supabase anon key is protected by database policies, and service-role credentials must never use a `NEXT_PUBLIC_` prefix.
 
 ## Supabase setup/schema
 
@@ -32,9 +33,19 @@ Do not commit `.env.local`. The public Supabase anon key is protected by databas
 
 Cloud project and file operations go through the Next.js API routes, which use the Supabase client on the server.
 
-## Judge0 setup
+## Executor setup
 
-Set `JUDGE0_BASE_URL` to Judge0 CE or your self-hosted endpoint. Set `JUDGE0_API_KEY` when the endpoint requires one. The `/api/run` route accepts the active filename, source, and stdin, then returns stdout, stderr, compilation output, status, time, and memory. Execution is limited to the language IDs in `src/lib/languageMap.ts`.
+The Compose service builds one local image that contains Python, GCC, G++, Node.js, and esbuild. The executor accepts `language`, `source`, and `stdin` at `POST http://localhost:4000/execute` and returns `stdout`, `stderr`, `status`, `exitCode`, and `time`. Each run uses a new container with no network, 0.5 CPU, 128 MB memory, a 5-second timeout, a process limit, a read-only filesystem, and automatic cleanup.
+
+The supported execution languages are Python (`.py`), C (`.c`), C++ (`.cpp`/`.cc`), JavaScript (`.js`), JSX (`.jsx`), and TSX (`.tsx`). HTML (`.html`/`.htm`) and CSS (`.css`) are preview files: **Run** reports that a preview is available, and the Preview panel renders them in its sandboxed iframe instead of sending them to the executor.
+
+For a direct health check:
+
+```bash
+curl http://localhost:4000/health
+```
+
+The Next.js `/api/run` endpoint keeps the editor-facing request shape: `{ "filename": "main.py", "content": "print(1)", "stdin": "" }`.
 
 ## How to use the IDE
 
@@ -53,7 +64,7 @@ The terminal UI uses xterm.js. It is intentionally disconnected unless `NEXT_PUB
 ## Troubleshooting
 
 - **Supabase errors:** verify both public variables and run `supabase/schema.sql`.
-- **Judge0 errors:** check the endpoint URL, API key, language availability, and server logs.
+- **Executor errors:** run `docker compose logs executor`, verify Docker Desktop is running, and rebuild with `docker compose up --build -d`.
 - **No local folder:** use Chrome or Edge and grant read/write permission again after a browser restart.
 - **No preview:** add an `index.html` or another `.html` file.
 - **Terminal disconnected:** configure a safe WebSocket service; the UI intentionally does not create a host terminal itself.

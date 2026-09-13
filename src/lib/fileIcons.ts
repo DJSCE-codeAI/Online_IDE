@@ -35,8 +35,7 @@ export function fileIconColor(filename: string): string {
   return (ext && COLOR_BY_EXT[ext]) || "text-(--text-secondary)";
 }
 
-// Display-only language label for the status bar — broader than languageMap,
-// which only lists languages Judge0 can execute (no HTML/CSS/JSON there).
+// Display-only language labels for file types that are not executable.
 const DISPLAY_LABEL_BY_EXT: Record<string, string> = {
   html: "HTML",
   htm: "HTML",

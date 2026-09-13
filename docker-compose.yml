@@ -1,0 +1,19 @@
+services:
+  executor:
+    build:
+      context: ./executor
+    image: executor-sandbox:local
+    environment:
+      PORT: 4000
+      EXECUTOR_IMAGE: executor-sandbox:local
+      WORK_ROOT: /work
+    ports:
+      - "4000:4000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - executor-work:/work
+    restart: unless-stopped
+
+volumes:
+  executor-work:
+    name: executor-work
