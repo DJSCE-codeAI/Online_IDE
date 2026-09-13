@@ -509,7 +509,14 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
             {rightPanel === "console" ? (
               <OutputPanel running={running} result={runResult} stdin={stdin} onStdinChange={setStdin} />
             ) : rightPanel === "terminal" ? (
-              <TerminalPanel socketUrl={process.env.NEXT_PUBLIC_TERMINAL_WS_URL} />
+              <TerminalPanel
+                socketUrl={process.env.NEXT_PUBLIC_TERMINAL_WS_URL}
+                filename={activeFile?.name}
+                content={activeFile?.content}
+                running={running}
+                result={runResult}
+                onRun={runActive}
+              />
             ) : (
               <PreviewPanel manifest={previewManifest} entryPath={previewEntryPath} />
             )}
